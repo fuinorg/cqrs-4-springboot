@@ -1,0 +1,391 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.fuin</groupId>
+        <artifactId>pom</artifactId>
+        <version>2.0.2</version>
+    </parent>
+
+    <groupId>org.fuin.cqrs4j</groupId>
+    <artifactId>cqrs-4-java-springboot</artifactId>
+    <version>0.7.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <description>Spring Boot flavour of the CQRS base classes (cqrs-4-java)</description>
+
+    <!--
+        Split out of the cqrs-4-java repository, which kept growing every time one flavour changed. The
+        groupId and every artifactId are deliberately unchanged: a consumer sees one more BOM to import
+        and nothing else. This pom used to be cqrs-4-java/springboot/pom.xml, which is why the modules
+        below still find it at ../pom.xml.
+    -->
+
+    <scm>
+        <url>https://github.com/fuinorg/cqrs-4-springboot/</url>
+        <connection>scm:git:git://github.com/fuinorg/cqrs-4-springboot.git</connection>
+        <developerConnection>scm:git:git@github.com:fuinorg/cqrs-4-springboot.git</developerConnection>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/fuinorg/cqrs-4-springboot/issues</url>
+    </issueManagement>
+
+    <properties>
+        <description>Spring Boot flavour of the CQRS base classes (cqrs-4-java)</description>
+        <!-- The cqrs-4-java release this builds against - core, esc, jackson, jsonb, jpa, test-helper. -->
+        <cqrs4j.version>0.7.0-SNAPSHOT</cqrs4j.version>
+        <spring.boot.version>3.5.14</spring.boot.version>
+        <jackson.version>2.18.2</jackson.version>
+        <esc.version>0.10.0-SNAPSHOT</esc.version>
+        <ddd4j.version>0.8.0-SNAPSHOT</ddd4j.version>
+        <objects4j.version>0.12.0-SNAPSHOT</objects4j.version>
+        <utils4j.version>0.15.1-SNAPSHOT</utils4j.version>
+        <units4j.version>0.12.1-SNAPSHOT</units4j.version>
+        <errorprone.version>2.49.0</errorprone.version>
+        <nullaway.version>0.13.5</nullaway.version>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/../jacoco/target/site/jacoco-aggregate/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <org-fuin-bom.version>1.0.2-SNAPSHOT</org-fuin-bom.version>
+    </properties>
+
+    <dependencyManagement>
+
+        <dependencies>
+
+            <!-- bom -->
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>bom</artifactId>
+                <version>${org-fuin-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.objects4j</groupId>
+                <artifactId>objects4j-bom</artifactId>
+                <version>${objects4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.esc</groupId>
+                <artifactId>esc-bom</artifactId>
+                <version>${esc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.ddd4j</groupId>
+                <artifactId>ddd-4-java-bom</artifactId>
+                <version>${ddd4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Everything this repository does not build - core, esc, jackson, jsonb, jpa, test-helper. -->
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-bom</artifactId>
+                <version>${cqrs4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Project -->
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-command-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-command-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-query-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-query-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-keycloak-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-keycloak-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-springboot-pm-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin.cqrs4j</groupId>
+                <artifactId>cqrs-4-java-test-springboot</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>utils4j</artifactId>
+                <version>${utils4j.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.fuin</groupId>
+                <artifactId>units4j</artifactId>
+                <version>${units4j.version}</version>
+            </dependency>
+
+        </dependencies>
+
+    </dependencyManagement>
+
+    <build>
+
+        <pluginManagement>
+
+            <plugins>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.8.1</version>
+                    <executions>
+                        <execution>
+                            <id>analyze</id>
+                            <goals>
+                                <goal>analyze-only</goal>
+                            </goals>
+                            <configuration>
+                                <failOnWarning>true</failOnWarning>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Pinned to the Jandex version bundled with Quarkus (3.21.0 → Jandex 3.2.7). Newer
+                     jandex-maven-plugin releases (3.3.0+) write index format v13, which the Jandex reader
+                     inside Quarkus 3.21.0 cannot parse (it only supports up to v12), breaking the Quarkus
+                     build augmentation in objects4j-quarkus-test. Keep aligned with the Quarkus Jandex. -->
+                <plugin>
+                    <groupId>io.smallrye</groupId>
+                    <artifactId>jandex-maven-plugin</artifactId>
+                    <version>3.2.7</version>
+                    <executions>
+                        <execution>
+                            <id>make-index</id>
+                            <goals>
+                                <goal>jandex</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Version intentionally inherited from the parent (org.fuin:pom = 3.5.5); this block only
+                     customizes argLine. Do NOT pin/downgrade to 3.5.3: it has a JUnit Platform regression that
+                     silently skips non-Jupiter engines (the ArchUnit @ArchTest engine), making every
+                     ArchitectureTest report "Tests run: 0" and enforce nothing. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <argLine>-Duser.country=US -Duser.language=en --add-opens java.base/java.util=ALL-UNNAMED ${argLine}</argLine>
+                        <!-- Backstop for hangs outside a test method (Quarkus augmentation, container
+                             startup). Must stay below the 30 minute job timeout in the GitHub workflow,
+                             otherwise the runner is killed first and no log is kept. -->
+                        <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+                        <properties>
+                            <configurationParameters>
+                                <!-- A stuck test (for example a gRPC call whose future never completes)
+                                     fails with a stack trace naming the blocked line instead of running
+                                     until the CI job is killed. Deliberately limited to testable methods:
+                                     a global default would also cover @BeforeAll, where pulling container
+                                     images can legitimately take a long time on a cold runner. -->
+                                junit.jupiter.execution.timeout.testable.method.default = 5 m
+                            </configurationParameters>
+                        </properties>
+                    </configuration>
+                </plugin>
+
+                <!-- NullAway (run as an Error Prone plugin) performs compile time null checking based on the
+                     JSpecify @NullMarked / @Nullable annotations. It is bound to the main compilation only
+                     (default-compile execution); test sources are deliberately not null checked. Only
+                     @NullMarked code is analyzed and all Error Prone checks except NullAway are disabled. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <id>default-compile</id>
+                            <configuration>
+                                <fork>true</fork>
+                                <showWarnings>true</showWarnings>
+                                <compilerArgs>
+                                    <arg>-XDcompilePolicy=simple</arg>
+                                    <arg>-XDaddTypeAnnotationsToSymbol=true</arg>
+                                    <arg>--should-stop=ifError=FLOW</arg>
+                                    <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:KnownInitializers=jakarta.validation.ConstraintValidator.initialize -XepOpt:NullAway:ExcludedFieldAnnotations=jakarta.validation.constraints.NotNull,jakarta.persistence.PersistenceContext</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                                    <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                                    <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                                </compilerArgs>
+                                <annotationProcessorPaths>
+                                    <path>
+                                        <groupId>com.google.errorprone</groupId>
+                                        <artifactId>error_prone_core</artifactId>
+                                        <version>${errorprone.version}</version>
+                                    </path>
+                                    <path>
+                                        <groupId>com.uber.nullaway</groupId>
+                                        <artifactId>nullaway</artifactId>
+                                        <version>${nullaway.version}</version>
+                                    </path>
+                                </annotationProcessorPaths>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <!-- Keep real Javadoc checks (broken references, bad HTML, syntax) but do not warn
+                         about missing comments on boilerplate members such as the mandatory Bean Validation
+                         message()/groups()/payload() elements, private fields and default constructors. -->
+                    <configuration>
+                        <doclint>all,-missing</doclint>
+                    </configuration>
+                </plugin>
+
+                <!-- Versions centralized here so submodules declare the plugin (for their own
+                     executions/config) without repeating the version. Not provided by the parent. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.1</version>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <!-- Kept in lockstep with the parent's maven-surefire-plugin (3.5.5). -->
+                    <version>3.5.5</version>
+                    <configuration>
+                        <!-- Same rationale as the surefire timeouts above. Integration tests start
+                             real containers, so the per-method budget is more generous. -->
+                        <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+                        <properties>
+                            <configurationParameters>
+                                junit.jupiter.execution.timeout.testable.method.default = 10 m
+                            </configurationParameters>
+                        </properties>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>3.6.0</version>
+                </plugin>
+
+            </plugins>
+
+        </pluginManagement>
+
+        <plugins>
+
+            <!-- org.fuin:bom deliberately overrides versions that the Quarkus / Spring Boot BOMs
+                 also manage (for example protobuf-java, which the KurrentDB client needs at 4.28.2
+                 while quarkus-bom pins 3.25.x). An imported BOM only wins against another imported
+                 BOM declared LATER in the same POM, so org.fuin:bom has to come first. Getting the
+                 order wrong fails silently - the override is simply ignored - which is why it is
+                 checked here instead of relying on a comment. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-protobuf-version-from-fuin-bom</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>com.google.protobuf:protobuf-java:[,4.28.2)</exclude>
+                                        <exclude>com.google.protobuf:protobuf-java-util:[,4.28.2)</exclude>
+                                    </excludes>
+                                    <message>protobuf-java must be 4.28.2 or newer: the KurrentDB client generates its gRPC stubs against it and needs com.google.protobuf.RuntimeVersion. With the 3.25.x line that quarkus-bom pins, the generated code dies on the gRPC callback thread and every call (for example appendToStream) hangs forever instead of failing. The version comes from org.fuin:bom, which therefore MUST be imported BEFORE io.quarkus:quarkus-bom / org.springframework.boot:spring-boot-dependencies in this POM - an imported BOM only wins against another imported BOM declared later in the same POM.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+    <modules>
+        <module>bom</module>
+        <module>common</module>
+        <module>command-core</module>
+        <module>command-starter</module>
+        <module>query-core</module>
+        <module>query-starter</module>
+        <module>keycloak-core</module>
+        <module>keycloak-starter</module>
+        <module>security</module>
+        <module>process-manager</module>
+        <module>test</module>
+        <module>jacoco</module>
+    </modules>
+
+</project>
