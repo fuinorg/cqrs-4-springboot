@@ -1,5 +1,6 @@
 package org.fuin.cqrs4j.springboot.query.starter;
 
+import org.fuin.cqrs4j.core.QueryExecutionContextProvider;
 import org.fuin.cqrs4j.core.TenantIdsSupplier;
 import org.fuin.cqrs4j.core.View;
 import org.fuin.cqrs4j.core.ViewRegistry;
@@ -7,6 +8,8 @@ import org.fuin.cqrs4j.esc.ConverterRegistration;
 import org.fuin.cqrs4j.esc.ProjectionLeaseService;
 import org.fuin.cqrs4j.esc.ProjectionService;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.fuin.cqrs4j.springboot.query.core.QueryExceptionHandlers;
+import org.fuin.cqrs4j.springboot.query.core.SecurityContextQueryExecutionContextProvider;
 import org.fuin.cqrs4j.springboot.query.core.base.EventstoreConfig;
 import org.fuin.cqrs4j.springboot.query.core.view.ProjectionFreshnessService;
 import org.fuin.cqrs4j.springboot.query.core.view.ProjectionLagMetrics;
@@ -15,6 +18,7 @@ import org.fuin.cqrs4j.springboot.query.core.view.ProjectionConfig;
 import org.fuin.cqrs4j.springboot.query.core.view.QryProjectionLeaseService;
 import org.fuin.cqrs4j.springboot.query.core.view.QryProjectionService;
 import org.fuin.cqrs4j.springboot.query.core.view.SpringViewRegistry;
+import org.fuin.ddd4j.core.TenantId;
 import org.fuin.ddd4j.core.WritableTenantContext;
 import org.fuin.esc.api.ConverterRegistry;
 import org.fuin.esc.api.EventStore;
@@ -54,6 +58,39 @@ import java.util.UUID;
 @Import({ProjectionFreshnessService.class, QryProjectionService.class, QryProjectionLeaseService.class})
 @EntityScan("org.fuin.cqrs4j.jpa.query")
 public class Cqrs4jConfig {
+
+    /**
+     * Creates the provider that derives the caller of a query from Spring Security's context.
+     *
+     * @param tenant          Tenant name reported for every request.
+     * @param anonymousUserId User id reported for an unauthenticated request.
+     *
+     * @return Execution context provider.
+     */
+    @Bean
+    @ConditionalOnMissingBean(QueryExecutionContextProvider.class)
+    // Referenced by name: Spring Security is an optional dependency, so the class may be absent.
+    @ConditionalOnClass(name = "org.springframework.security.core.context.SecurityContextHolder")
+    public QueryExecutionContextProvider queryExecutionContextProvider(
+            @Value("${org.fuin.cqrs4j.query.tenant:default}") final String tenant,
+            @Value("${org.fuin.cqrs4j.query.anonymous-user:anonymous}") final String anonymousUserId) {
+        return new SecurityContextQueryExecutionContextProvider(new TenantId(tenant), anonymousUserId);
+    }
+
+    /**
+     * Maps a refused read to HTTP 403.
+     * <p>
+     * Registered here rather than left to a component scan, because a query server deployed on its own has
+     * no {@code command-core} on the classpath and would otherwise answer 500 for every refused read.
+     *
+     * @return Exception handlers.
+     */
+    @Bean
+    @ConditionalOnMissingBean(QueryExceptionHandlers.class)
+    @ConditionalOnClass(name = "org.springframework.web.bind.annotation.ControllerAdvice")
+    public QueryExceptionHandlers queryExceptionHandlers() {
+        return new QueryExceptionHandlers();
+    }
 
     @Bean
     @ConditionalOnMissingBean

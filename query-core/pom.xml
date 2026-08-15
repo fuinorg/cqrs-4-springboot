@@ -127,6 +127,21 @@
             <artifactId>spring-beans</artifactId>
         </dependency>
 
+        <!-- Only needed by SecurityContextQueryExecutionContextProvider; optional so an
+             application without Spring Security is unaffected. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Only needed by QueryExceptionHandlers; optional so a non-web application is unaffected. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>

@@ -64,7 +64,8 @@ public class CommandVersioningTest {
         final ObjectWriter writer = mock(ObjectWriter.class);
         when(objectMapper.writer()).thenReturn(writer);
         authorizer = mock(CommandAuthorizer.class);
-        when(authorizer.authorized(any(), any()))
+        // Three arguments: the dispatcher passes the execution context to the authorizer too.
+        when(authorizer.authorized(any(), any(), any()))
                 .thenReturn(new CommandAuthorizer.Result(true, new GreetCommandV2("x"), null, List.of()));
         validator = mock(Validator.class);
         when(validator.validate(any())).thenReturn(Collections.emptySet());

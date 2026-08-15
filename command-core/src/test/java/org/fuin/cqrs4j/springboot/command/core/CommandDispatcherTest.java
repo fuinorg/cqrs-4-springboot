@@ -82,7 +82,10 @@ public class CommandDispatcherTest {
         when(validator.validate(any())).thenReturn(Collections.emptySet());
         when(commandHandlerRegistry.findHandlerClass(any())).thenReturn((Class) CommandHandler.class);
         when(context.getBean((Class) any(Class.class))).thenReturn(commandHandler);
-        when(authorizer.authorized(any(), any()))
+        // The dispatcher calls the three-argument overload that also carries the execution context.
+        // Mockito stubs an exact method, so stubbing the two-argument one would leave the call the
+        // dispatcher actually makes returning null.
+        when(authorizer.authorized(any(), any(), any()))
                 .thenReturn(new CommandAuthorizer.Result(true, cmd, null, List.of()));
         when(commandHandler.handle(any(), any())).thenReturn("ok");
     }

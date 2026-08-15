@@ -146,7 +146,10 @@ public class CommandDispatcher {
         if (obj instanceof Command cmd) {
             final Class<? extends CommandHandler> commandHandlerClass = commandHandlerRegistry.findHandlerClass(cmd.getClass());
             final CommandHandler commandHandler = context.getBean(commandHandlerClass);
-            final CommandAuthorizer.Result authResult  = authorizer.authorized(cmd, userRoles);
+            // The context goes to the authorizer as well as to the handler: an implementation that decides
+            // from the application's own data rather than from the roles in the token needs to know which
+            // subject and tenant is asking. Implementations that only look at roles ignore it.
+            final CommandAuthorizer.Result authResult = authorizer.authorized(cmd, userRoles, executionContext);
             if (!authResult.success()) {
                 LOG.error("User '{}' not authorized! {}", executionContext.getUser().getUserId(), authResult.getMessage());
                 throw new UnauthorizedException();

@@ -46,10 +46,16 @@ public class ArchitectureTest {
                     "org.springframework.beans..",
                     "org.springframework.boot..",
                     "org.springframework.context..",
+                    "org.springframework.http..",
                     "org.springframework.jdbc..",
                     "org.springframework.scheduling..",
+                    // Optional dependencies: the execution context provider reads Spring Security's context,
+                    // and the exception handlers are a web @ControllerAdvice. Both are absent in an
+                    // application that uses neither.
+                    "org.springframework.security..",
                     "org.springframework.stereotype..",
                     "org.springframework.transaction..",
+                    "org.springframework.web..",
                     // Fault tolerance for the scheduled catch-up (circuit breaker).
                     "io.github.resilience4j.."
                     );
