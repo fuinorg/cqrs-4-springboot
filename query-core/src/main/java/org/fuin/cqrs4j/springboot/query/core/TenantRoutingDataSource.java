@@ -111,11 +111,19 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource implement
 
         final DataSource defaultDataSource = createDefaultDataSource();
         this.dataSourceMap = new ConcurrentHashMap<>();
+        // Keyed by the schema name, which is what determineCurrentLookupKey() returns. Keying by the
+        // TenantId object instead makes every lookup miss, and a miss is not an error: Spring's routing
+        // data source falls back to the default one, so every tenant would quietly share a single schema -
+        // the exact outcome this class exists to prevent, reported by nothing.
+        this.dataSourceMap.put(defaultSchemaName, defaultDataSource);
         tenantRepository.getTenantIds().forEach(
-                tenantId -> dataSourceMap.put(tenantId, createDataSource(tenantId))
+                tenantId -> dataSourceMap.put(tenantId.name(), createDataSource(tenantId))
         );
         this.setTargetDataSources(dataSourceMap);
         this.setDefaultTargetDataSource(defaultDataSource);
+        // And when the key is genuinely unknown - a tenant the repository has not been told about, or one
+        // that was removed - refuse rather than serve it the schema everybody else is in.
+        this.setLenientFallback(false);
 
     }
 
@@ -128,7 +136,9 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource implement
     @Async
     public void handleEvent(TenantAddedEvent event) {
         final TenantId tenantId = event.tenant().getTenantId();
-        dataSourceMap.put(tenantId, createDataSource(tenantId));
+        dataSourceMap.put(tenantId.name(), createDataSource(tenantId));
+        // Re-resolve, or the new entry sits in the map that was already copied at startup.
+        afterPropertiesSet();
     }
 
     /**
@@ -139,7 +149,8 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource implement
     @EventListener
     @Async
     public void handleEvent(TenantRemovedEvent event) {
-        dataSourceMap.remove(event.tenant().getTenantId());
+        dataSourceMap.remove(event.tenant().getTenantId().name());
+        afterPropertiesSet();
     }
 
     @Override
