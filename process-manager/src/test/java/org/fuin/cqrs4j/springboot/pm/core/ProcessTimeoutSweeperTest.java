@@ -2,6 +2,8 @@ package org.fuin.cqrs4j.springboot.pm.core;
 
 import org.fuin.cqrs4j.core.ProcessTimeoutHandler;
 import org.fuin.cqrs4j.core.ProcessTimeoutHandler.DueProcessTimeout;
+import org.fuin.ddd4j.core.TenantId;
+import org.fuin.ddd4j.core.ThreadLocalTenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -9,13 +11,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +42,12 @@ class ProcessTimeoutSweeperTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    private ProcessTimeoutSweeper newSweeper(final int maxRetries, final TenantId... tenants) {
+        final ProcessTimeoutConfig config = new ProcessTimeoutConfig("*/5 * * * * *", 100, maxRetries);
+        return new ProcessTimeoutSweeper(repository, config, handlers, transactionManager,
+                new ThreadLocalTenantContext(), () -> Stream.of(tenants));
+    }
+
     private ProcessTimeoutSweeper newSweeper(final int maxRetries) {
         final ProcessTimeoutConfig config = new ProcessTimeoutConfig("*/5 * * * * *", 100, maxRetries);
         return new ProcessTimeoutSweeper(repository, config, handlers, transactionManager);
@@ -44,6 +55,29 @@ class ProcessTimeoutSweeperTest {
 
     private static DueProcessTimeout due(final String id) {
         return new DueProcessTimeout(id, "OrderProcess", 1, 1000L, "await-ack", 0);
+    }
+
+    @Test
+    void testEveryTenantIsSweptUnderItsOwnContext() {
+        // PREPARE - a deadline belongs to the tenant whose process set it and lives in that tenant's
+        // tables, so a sweep with nothing on the thread reaches one tenant and leaves the rest waiting on
+        // deadlines that never fire.
+        final ThreadLocalTenantContext context = new ThreadLocalTenantContext();
+        final List<String> sweptAs = new ArrayList<>();
+        final ProcessTimeoutSweeper testee =
+                newSweeper(5, new TenantId("acme"), new TenantId("beta"));
+        when(handlers.getIfUnique()).thenReturn(handler);
+        when(repository.fetchDue(anyLong(), eq(100))).thenAnswer(invocation -> {
+            sweptAs.add(context.getTenantId().map(TenantId::asString).orElse("<none>"));
+            return List.of();
+        });
+
+        // TEST
+        testee.drain();
+
+        // VERIFY
+        assertThat(sweptAs).containsExactly("acme", "beta");
+        assertThat(context.getTenantId()).isEmpty();
     }
 
     @Test

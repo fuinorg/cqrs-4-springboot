@@ -1,6 +1,9 @@
 package org.fuin.cqrs4j.springboot.pm.core;
 
 import org.fuin.cqrs4j.springboot.pm.core.CommandOutboxService.Entry;
+import org.fuin.cqrs4j.core.TenantLoop;
+import org.fuin.cqrs4j.core.TenantIdsSupplier;
+import org.fuin.ddd4j.core.WritableTenantContext;
 import org.fuin.objects4j.common.Contract;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -48,6 +51,14 @@ public class CommandQueueExecutor {
 
     private final Lock lock = new ReentrantLock();
 
+    /** Puts each tenant on the thread in turn; {@literal null} when the application is single-tenant. */
+    @Nullable
+    private final WritableTenantContext tenantContext;
+
+    /** Supplies the tenants to sweep; {@literal null} when the application is single-tenant. */
+    @Nullable
+    private final TenantIdsSupplier tenantIds;
+
     /**
      * Guards the delivery of a queued command. Without it a command endpoint that is down is contacted once
      * per queued command on every tick, and - worse - every failed attempt consumes the retry budget, so a
@@ -69,7 +80,28 @@ public class CommandQueueExecutor {
                                 final CommandRestClient commandRestClient,
                                 final CommandQueueConfig config,
                                 final PlatformTransactionManager transactionManager) {
+        this(outboxService, commandRestClient, config, transactionManager, null, null);
+    }
+
+    /**
+     * Constructor for a multi-tenant application.
+     *
+     * @param outboxService      Service used to read and update the outbox.
+     * @param commandRestClient  Client used to deliver commands to the command endpoint.
+     * @param config             Configuration (batch size, max retries, ...).
+     * @param transactionManager Transaction manager used to open per-command transactions.
+     * @param tenantContext      Puts each tenant on the thread while its outbox is drained.
+     * @param tenantIds          Supplies the tenants whose outboxes are drained.
+     */
+    public CommandQueueExecutor(final CommandOutboxService outboxService,
+                                final CommandRestClient commandRestClient,
+                                final CommandQueueConfig config,
+                                final PlatformTransactionManager transactionManager,
+                                @Nullable final WritableTenantContext tenantContext,
+                                @Nullable final TenantIdsSupplier tenantIds) {
         super();
+        this.tenantContext = tenantContext;
+        this.tenantIds = tenantIds;
         Contract.requireArgNotNull("outboxService", outboxService);
         Contract.requireArgNotNull("commandRestClient", commandRestClient);
         Contract.requireArgNotNull("config", config);
@@ -92,6 +124,17 @@ public class CommandQueueExecutor {
             return;
         }
         try {
+            // One outbox per tenant, drained with that tenant on the thread: the rows live in the tenant's
+            // own schema, and the command about to be delivered has to be sent as that tenant rather than
+            // as whichever one happened to be configured.
+            TenantLoop.run(tenantContext, tenantIds, this::drainCurrentTenant);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void drainCurrentTenant() {
+        try {
             final List<Entry> batch = requiresNewTransaction.execute(status -> outboxService.fetchBatch(config.getBatchSize()));
             if (batch == null || batch.isEmpty()) {
                 return;
@@ -106,8 +149,6 @@ public class CommandQueueExecutor {
             }
         } catch (final RuntimeException ex) { // NOSONAR - a failing run must not kill the scheduler
             LOG.error("Error draining the command outbox", ex);
-        } finally {
-            lock.unlock();
         }
     }
 

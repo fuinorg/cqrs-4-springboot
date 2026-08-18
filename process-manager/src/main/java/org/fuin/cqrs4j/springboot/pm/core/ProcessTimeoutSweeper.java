@@ -2,6 +2,10 @@ package org.fuin.cqrs4j.springboot.pm.core;
 
 import org.fuin.cqrs4j.core.ProcessTimeoutHandler;
 import org.fuin.cqrs4j.core.ProcessTimeoutHandler.DueProcessTimeout;
+import org.jspecify.annotations.Nullable;
+import org.fuin.cqrs4j.core.TenantLoop;
+import org.fuin.cqrs4j.core.TenantIdsSupplier;
+import org.fuin.ddd4j.core.WritableTenantContext;
 import org.fuin.objects4j.common.Contract;
 import org.fuin.objects4j.common.ThreadSafe;
 import org.slf4j.Logger;
@@ -47,6 +51,14 @@ public class ProcessTimeoutSweeper {
 
     private final Lock lock = new ReentrantLock();
 
+    /** Puts each tenant on the thread in turn; {@literal null} when the application is single-tenant. */
+    @Nullable
+    private final WritableTenantContext tenantContext;
+
+    /** Supplies the tenants to sweep; {@literal null} when the application is single-tenant. */
+    @Nullable
+    private final TenantIdsSupplier tenantIds;
+
     /**
      * Constructor with mandatory data.
      *
@@ -60,7 +72,28 @@ public class ProcessTimeoutSweeper {
                                  final ProcessTimeoutConfig config,
                                  final ObjectProvider<ProcessTimeoutHandler> handlers,
                                  final PlatformTransactionManager transactionManager) {
+        this(repository, config, handlers, transactionManager, null, null);
+    }
+
+    /**
+     * Constructor for a multi-tenant application.
+     *
+     * @param repository         Repository used to read and update the timeout tables.
+     * @param config             Configuration (batch size, max retries, cron).
+     * @param handlers           Application-provided timeout handler(s).
+     * @param transactionManager Transaction manager used to open per-timeout transactions.
+     * @param tenantContext      Puts each tenant on the thread while its timeouts are swept.
+     * @param tenantIds          Supplies the tenants whose timeouts are swept.
+     */
+    public ProcessTimeoutSweeper(final ProcessTimeoutRepository repository,
+                                 final ProcessTimeoutConfig config,
+                                 final ObjectProvider<ProcessTimeoutHandler> handlers,
+                                 final PlatformTransactionManager transactionManager,
+                                 @Nullable final WritableTenantContext tenantContext,
+                                 @Nullable final TenantIdsSupplier tenantIds) {
         super();
+        this.tenantContext = tenantContext;
+        this.tenantIds = tenantIds;
         Contract.requireArgNotNull("repository", repository);
         Contract.requireArgNotNull("config", config);
         Contract.requireArgNotNull("handlers", handlers);
@@ -89,6 +122,17 @@ public class ProcessTimeoutSweeper {
             return;
         }
         try {
+            // A deadline belongs to the tenant whose process set it, and lives in that tenant's tables.
+            // Sweeping with nothing on the thread reaches one tenant's timeouts and leaves every other
+            // tenant's process managers waiting for a deadline that never fires.
+            TenantLoop.run(tenantContext, tenantIds, () -> sweepCurrentTenant(handler));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void sweepCurrentTenant(final ProcessTimeoutHandler handler) {
+        try {
             final long now = now();
             final List<DueProcessTimeout> batch = requiresNewTransaction.execute(
                     status -> repository.fetchDue(now, config.getBatchSize()));
@@ -101,8 +145,6 @@ public class ProcessTimeoutSweeper {
             }
         } catch (final RuntimeException ex) { // NOSONAR - a failing run must not kill the scheduler
             LOG.error("Error sweeping process timeouts", ex);
-        } finally {
-            lock.unlock();
         }
     }
 

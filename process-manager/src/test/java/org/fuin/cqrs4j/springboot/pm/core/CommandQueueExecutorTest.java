@@ -1,19 +1,24 @@
 package org.fuin.cqrs4j.springboot.pm.core;
 
 import org.fuin.cqrs4j.springboot.pm.core.CommandOutboxService.Entry;
+import org.fuin.ddd4j.core.TenantId;
+import org.fuin.ddd4j.core.ThreadLocalTenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 /**
@@ -31,10 +36,37 @@ class CommandQueueExecutorTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    private CommandQueueExecutor newExecutor(final int maxRetries, final TenantId... tenants) {
+        final CommandQueueConfig config = new CommandQueueConfig("http://localhost", "*/5 * * * * *", 100,
+                maxRetries, null, null, null, null, null, null);
+        return new CommandQueueExecutor(outboxService, commandRestClient, config, transactionManager,
+                new ThreadLocalTenantContext(), () -> Stream.of(tenants));
+    }
+
     private CommandQueueExecutor newExecutor(final int maxRetries) {
         final CommandQueueConfig config = new CommandQueueConfig("http://localhost", "*/5 * * * * *", 100, maxRetries,
                 null, null, null, null, null, null);
         return new CommandQueueExecutor(outboxService, commandRestClient, config, transactionManager);
+    }
+
+    @Test
+    void testEveryTenantsOutboxIsDrainedUnderItsOwnContext() {
+        // PREPARE - each tenant's queued commands live in that tenant's own rows, and the command about to
+        // be delivered has to be sent as that tenant rather than as whichever one was configured.
+        final ThreadLocalTenantContext context = new ThreadLocalTenantContext();
+        final List<String> drainedAs = new ArrayList<>();
+        final CommandQueueExecutor testee = newExecutor(5, new TenantId("acme"), new TenantId("beta"));
+        when(outboxService.fetchBatch(100)).thenAnswer(invocation -> {
+            drainedAs.add(context.getTenantId().map(TenantId::asString).orElse("<none>"));
+            return List.of();
+        });
+
+        // TEST
+        testee.drain();
+
+        // VERIFY
+        assertThat(drainedAs).containsExactly("acme", "beta");
+        assertThat(context.getTenantId()).isEmpty();
     }
 
     @Test
