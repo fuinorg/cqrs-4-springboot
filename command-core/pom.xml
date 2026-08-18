@@ -110,6 +110,10 @@
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
+            <!-- Container API: compile here, not transitive. Boot/Tomcat apps already
+                 get jakarta.servlet.* from tomcat-embed-core; a compile-scoped copy
+                 would split that package on the application classpath. -->
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
