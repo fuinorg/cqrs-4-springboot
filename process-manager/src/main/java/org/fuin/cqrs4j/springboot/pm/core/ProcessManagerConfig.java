@@ -4,12 +4,16 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.fuin.cqrs4j.core.CommandAuthProvider;
 import org.fuin.objects4j.common.ThreadSafe;
 import org.fuin.utils4j.TestOmitted;
+import org.fuin.cqrs4j.core.ProcessTimeoutHandler;
+import org.fuin.cqrs4j.core.TenantIdsSupplier;
+import org.fuin.ddd4j.core.WritableTenantContext;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Configuration;
 import org.fuin.cqrs4j.core.CommandDeliveryException;
@@ -43,8 +47,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 // The four annotated classes of that package are registered explicitly instead of being
 // discovered: they are all injected by type, so their bean names are irrelevant, and an
 // application no longer has to have this package inside its own component scan.
-@Import({CommandOutboxService.class, ProcessTimeoutRepository.class, CommandQueueExecutor.class,
-        ProcessTimeoutSweeper.class})
+@Import({CommandOutboxService.class, ProcessTimeoutRepository.class})
 @EntityScan("org.fuin.cqrs4j.jpa.pm")
 public class ProcessManagerConfig {
 
@@ -57,6 +60,58 @@ public class ProcessManagerConfig {
      * @param authProviders Optional application-provided authentication providers.
      * @return Command client proxy.
      */
+    /**
+     * The outbox drain.
+     * <p>
+     * Declared here rather than imported as an annotated class, because it has two constructors - one for a
+     * single-tenant application and one that loops the known tenants - and letting Spring choose between
+     * them by its own rules is precisely the wrong thing to rely on: picking the single-tenant one in a
+     * multi-tenant application drains one tenant's outbox and quietly leaves every other tenant's commands
+     * queued forever.
+     *
+     * @param outboxService      Service used to read and update the outbox.
+     * @param commandRestClient  Client used to deliver commands to the command endpoint.
+     * @param config             Configuration (batch size, max retries, ...).
+     * @param transactionManager Transaction manager used to open per-command transactions.
+     * @param tenantContext      Present only in a multi-tenant application.
+     * @param tenantIds          Present only in a multi-tenant application.
+     *
+     * @return The executor.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public CommandQueueExecutor commandQueueExecutor(final CommandOutboxService outboxService,
+            final CommandRestClient commandRestClient, final CommandQueueConfig config,
+            final PlatformTransactionManager transactionManager,
+            final ObjectProvider<WritableTenantContext> tenantContext,
+            final ObjectProvider<TenantIdsSupplier> tenantIds) {
+        return new CommandQueueExecutor(outboxService, commandRestClient, config, transactionManager,
+                tenantContext.getIfAvailable(), tenantIds.getIfAvailable());
+    }
+
+    /**
+     * The timeout sweep. Declared for the same reason as the executor above.
+     *
+     * @param repository         Repository used to read and update the timeout tables.
+     * @param config             Configuration (batch size, max retries, cron).
+     * @param handlers           Application-provided timeout handler(s).
+     * @param transactionManager Transaction manager used to open per-timeout transactions.
+     * @param tenantContext      Present only in a multi-tenant application.
+     * @param tenantIds          Present only in a multi-tenant application.
+     *
+     * @return The sweeper.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ProcessTimeoutSweeper processTimeoutSweeper(final ProcessTimeoutRepository repository,
+            final ProcessTimeoutConfig config, final ObjectProvider<ProcessTimeoutHandler> handlers,
+            final PlatformTransactionManager transactionManager,
+            final ObjectProvider<WritableTenantContext> tenantContext,
+            final ObjectProvider<TenantIdsSupplier> tenantIds) {
+        return new ProcessTimeoutSweeper(repository, config, handlers, transactionManager,
+                tenantContext.getIfAvailable(), tenantIds.getIfAvailable());
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public CommandRestClient commandRestClient(final CommandQueueConfig config,
