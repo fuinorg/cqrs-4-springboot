@@ -31,6 +31,7 @@ public class ArchitectureTest {
             .onlyDependOnClassesThat()
             .resideInAnyPackage(THIS_PACKAGE, "java..",
                     "io.micrometer..",
+                    "jakarta.persistence..",
                     "org.fuin.cqrs4j.core..",
                     "org.fuin.cqrs4j.esc..",
                     "org.fuin.cqrs4j.springboot.query.core..",
@@ -43,6 +44,7 @@ public class ArchitectureTest {
                     "org.springframework.context..",
                     "org.springframework.core..",
                     "org.springframework.data..",
+                    "org.springframework.orm..",
                     "org.springframework.scheduling..",
                     "org.springframework.transaction.."
                     );

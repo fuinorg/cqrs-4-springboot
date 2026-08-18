@@ -102,6 +102,18 @@
             <artifactId>spring-core</artifactId>
         </dependency>
 
+        <!-- SharedEntityManagerCreator, used to expose the read model's entity manager under a name. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-orm</artifactId>
+        </dependency>
+
+        <!-- EntityManager / EntityManagerFactory in the read model entity manager bean. -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>

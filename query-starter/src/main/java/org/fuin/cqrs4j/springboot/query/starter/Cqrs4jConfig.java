@@ -25,6 +25,8 @@ import org.fuin.esc.api.EventStore;
 import org.fuin.esc.api.ProjectionAdminEventStore;
 import org.fuin.esc.api.SubscribableEventStoreAsync;
 import org.fuin.objects4j.common.ThreadSafe;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
@@ -38,6 +40,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -92,6 +95,28 @@ public class Cqrs4jConfig {
         return new QueryExceptionHandlers();
     }
 
+    /**
+     * The entity manager the read model is written to and queried through, under a name views and view
+     * services can ask for by qualifier.
+     * <p>
+     * With one datasource this is simply the shared entity manager of the primary factory, and naming it
+     * changes nothing. It exists for the application that has <em>two</em>: a read model whose durability
+     * differs from the rest of its persistence - an in-memory read model rebuilt from the event store at
+     * every start, beside process-manager state that has to survive a restart. There, an unqualified
+     * injection point cannot say which of the two it means, and the read side is the half that must not
+     * silently get the other one. Such an application declares its own bean of this name and the default
+     * below backs off.
+     *
+     * @param entityManagerFactory Factory to create the shared entity manager from.
+     *
+     * @return Entity manager of the read model.
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "readModelEntityManager")
+    public EntityManager readModelEntityManager(final EntityManagerFactory entityManagerFactory) {
+        return SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory);
+    }
+
     @Bean
     @ConditionalOnMissingBean
     public ViewRegistry viewRegistry(ConfigurableBeanFactory beanFactory, List<View> views) {
@@ -112,8 +137,17 @@ public class Cqrs4jConfig {
         return ConverterRegistration.toRegistry(registrations);
     }
 
+    /**
+     * The single view manager, for the ordinary case of one read model in one database.
+     * <p>
+     * It backs off when the application declares its own, which is what an application does when its views
+     * do not all share one durability: a read model rebuilt from the event store at every start needs its
+     * chunk transaction and its checkpoint on the disposable side, while process managers need theirs on
+     * the durable one, and a manager holds exactly one of each.
+     */
     @Bean
     @Order(0)
+    @ConditionalOnMissingBean(SpringViewManager.class)
     public SpringViewManager viewManager(final ScheduledAnnotationBeanPostProcessor postProcessor,
                                          final ViewRegistry viewRegistry,
                                          final EventStore eventstore,
