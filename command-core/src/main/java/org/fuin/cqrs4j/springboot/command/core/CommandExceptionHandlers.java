@@ -135,15 +135,29 @@ public class CommandExceptionHandlers {
 
     /**
      * Handles a failed command execution by inspecting the cause and mapping the various aggregate
-     * related failures to a fitting HTTP status code (for example "not found" or "conflict").
+     * related failures to a fitting HTTP status code (for example "not found", "conflict" or
+     * "bad request"). Accepts the unchecked wrapper the endpoint throws as well as the checked failure
+     * itself, because only the wrapper ever leaves the endpoint.
      *
-     * @param cef Exception wrapping the actual cause of the failure.
+     * @param cef Failure, or the unchecked wrapper around it.
      * @return Response entity with an error result and the appropriate HTTP status.
      */
-    @ExceptionHandler(CommandExecutionFailedException.class)
-    public ResponseEntity<Result<?>> handleCommandExecutionFailed(CommandExecutionFailedException cef) {
-        final Throwable rawCause = cef.getCause();
+    @ExceptionHandler({CommandExecutionFailedException.class, CommandExecutionRuntimeException.class})
+    public ResponseEntity<Result<?>> handleCommandExecutionFailed(Exception cef) {
+        // The endpoint wraps the checked failure to keep its interface signature, so what arrives here is
+        // usually the unchecked wrapper. Unwrapping once is what makes the mapping below reachable at all -
+        // without it every failure fell through to the default handler and answered 500.
+        final Throwable unwrapped = (cef instanceof CommandExecutionRuntimeException && cef.getCause() != null)
+                ? cef.getCause() : cef;
+        final Throwable rawCause = unwrapped.getCause();
         final Exception cause = (rawCause instanceof Exception ex) ? ex : cef;
+        if (cause instanceof ConstraintViolationException ex) {
+            // An invalid argument the caller can correct, so it is answered like one that was caught at the
+            // request boundary. Logged with the stack trace all the same: the same exception is raised by
+            // preconditions guarding calls the caller never made, and those are defects, not bad requests.
+            LOG.error("Constraint violation while executing the command", ex);
+            return new ResponseEntity<>(new SimpleResult(ResultType.ERROR, code(ex), ex.getMessage()), HttpStatus.BAD_REQUEST);
+        }
         if (cause instanceof AggregateNotFoundException ex) {
             LOG.error("Aggregate not found: {}", ex.getMessage());
             return new ResponseEntity<>(new SimpleResult(ResultType.ERROR, code(ex), ex.getMessage()), HttpStatus.NOT_FOUND);
